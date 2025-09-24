@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ระบบยืม-คืนหนังสือ</title>
+
+  <!-- Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --blue:#1664e2; --blue-600:#1454bd;
+      --green:#c9f7e9; --green-badge:#16a34a;
+      --red:#ffd5d5; --red-badge:#dc2626;
+      --bg:#f6f8fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280;
+      --shadow:0 10px 24px rgba(2,6,23,.08);
+      --radius:18px;
+    }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family:"Prompt",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:var(--text); }
+
+    /* Topbar */
+    .topbar{
+      background:var(--blue); color:#fff; padding:16px 20px; position:sticky; top:0; z-index:40;
+      display:flex; align-items:center; gap:14px;
+    }
+    .brand{ font-weight:700; font-size:20px; letter-spacing:.2px; display:flex; align-items:center; gap:8px;}
+    .grow{ flex:1 }
+    .btn{ background:#fff; color:var(--blue); border:none; padding:10px 16px; border-radius:999px; cursor:pointer; font-weight:600; box-shadow:var(--shadow); }
+    .btn:active{ transform:translateY(1px); }
+
+    /* Layout */
+    .container{ max-width:1100px; margin:24px auto; padding:0 16px; }
+    .legend{ display:flex; align-items:center; gap:10px; margin-bottom:12px; color:var(--muted); font-weight:500;}
+    .legend .dot{ width:10px; height:10px; border-radius:999px; display:inline-block;}
+    .dot.green{ background:var(--green-badge); } .dot.red{ background:var(--red-badge); }
+
+    /* Stats */
+    .stats{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+    .stat{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 18px; min-width:220px; display:flex; align-items:center; justify-content:space-between; }
+
+    /* Cards grid */
+    .grid{ display:grid; grid-template-columns:repeat( auto-fill, minmax(240px,1fr) ); gap:16px; }
+    .card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; display:flex; flex-direction:column; gap:10px; }
+    .title{ font-weight:600; line-height:1.4; }
+    .badge{ padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; width:max-content;}
+    .badge.green{ background:var(--green); color:var(--green-badge); }
+    .badge.red{ background:var(--red); color:var(--red-badge); }
+
+    /* Tabs + History table */
+    .tabs{ display:flex; gap:6px; margin:10px 0 18px; }
+    .tab{ background:#e8eefc; color:#1e3a8a; border:none; padding:8px 14px; border-radius:12px; cursor:pointer; font-weight:600; }
+    .tab.active{ background:var(--blue); color:#fff; }
+    table{ width:100%; border-collapse:separate; border-spacing:0; background:var(--card); box-shadow:var(--shadow); border-radius:var(--radius); overflow:hidden; }
+    th, td{ padding:12px 14px; text-align:left; border-bottom:1px solid #eef2f7; font-size:14px; }
+    th{ background:#f1f5fb; color:#334155; font-weight:700; }
+    tr:last-child td{ border-bottom:none; }
+
+    /* Modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,.45); display:none; align-items:center; justify-content:center; padding:18px; z-index:50; }
+    .modal{ width:100%; max-width:520px; background:#fff; border-radius:20px; box-shadow:var(--shadow); }
+    .modal-header{ padding:16px 18px; border-bottom:1px solid #eef2f7; font-weight:700; display:flex; align-items:center; justify-content:space-between;}
+    .modal-body{ padding:18px; display:flex; flex-direction:column; gap:12px;}
+    .modal-actions{ padding:16px 18px; display:flex; gap:10px; justify-content:flex-end; }
+    .close{ cursor:pointer; font-weight:700; color:var(--muted); }
+
+    label{ font-size:13px; color:#334155; font-weight:600; }
+    input, select{ width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px; font-family:inherit; }
+    .btn-primary{ background:var(--blue); color:#fff; }
+    .btn-secondary{ background:#e5e7eb; color:#111827; }
+
+    .hidden{ display:none !important; }
+    .mt{ margin-top:12px;}
+    .text-muted{ color:var(--muted); }
+
+    .toast{ position:fixed; bottom:16px; right:16px; background:#111827; color:#fff; padding:10px 14px; border-radius:999px; opacity:0; transform:translateY(10px); transition:.25s; z-index:60; }
+    .toast.show{ opacity:1; transform:none; }
+  </style>
+</head>
+
+<body>
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="brand">📚 ระบบยืม-คืนหนังสือ</div>
+    <div class="grow"></div>
+    <button class="btn" onclick="openBorrow()">ยืมหนังสือ</button>
+    <button class="btn" onclick="openReturn()">คืนหนังสือ</button>
+    <button class="btn" onclick="toggleHistory()">ประวัติ</button>
+  </div>
+
+  <div class="container">
+    <div class="legend">
+      <span class="dot green"></span> พร้อมใช้งาน
+      <span class="dot red" style="margin-left:10px;"></span> ถูกยืม
+    </div>
+
+    <!-- Stats -->
+    <div id="stats" class="stats"></div>
+
+    <!-- Dashboard grid -->
+    <div id="dashboard" class="grid"></div>
+
+    <!-- History -->
+    <div id="historyWrap" class="hidden mt">
+      <div class="tabs">
+        <button id="tabAll" class="tab active"   onclick="setHistoryFilter('all')">ทั้งหมด</button>
+        <button id="tabActive" class="tab"       onclick="setHistoryFilter('active')">ยังไม่คืน</button>
+        <button id="tabReturned" class="tab"     onclick="setHistoryFilter('returned')">คืนแล้ว</button>
+      </div>
+      <table id="historyTable">
+        <thead>
+          <tr>
+            <th>รหัส</th>
+            <th>ชื่อหนังสือ</th>
+            <th>ผู้ยืม</th>
+            <th>วันที่ยืม</th>
+            <th>กำหนดคืน</th>
+            <th>วันที่คืน</th>
+            <th>สถานะ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Borrow Modal -->
+  <div id="borrowModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        ยืมหนังสือ
+        <span class="close" onclick="closeBorrow()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label>เลือกหนังสือ</label>
+          <select id="borrowBookTitle"></select>
+        </div>
+        <div>
+          <label>ชื่อผู้ยืม</label>
+          <input id="borrowerName" placeholder="กรอกชื่อผู้ยืม" />
+        </div>
+        <div>
+          <label>วันที่ยืม</label>
+          <input id="borrowDate" type="date" />
+        </div>
+        <div>
+          <label>กำหนดคืน</label>
+          <input id="dueDate" type="date" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeBorrow()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="submitBorrow()">ยืนยันการยืม</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Return Modal -->
+  <div id="returnModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        คืนหนังสือ
+        <span class="close" onclick="closeReturn()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label>เลือกหนังสือที่ต้องการคืน</label>
+          <select id="returnBookTitle"></select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeReturn()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="submitReturn()">ยืนยันการคืน</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    /* ---------- State ---------- */
+    let BOOKS = [];
+    let HISTORY = [];
+    let HISTORY_FILTER = 'all';
+
+    /* ---------- Utils ---------- */
+    const $ = (s) => document.querySelector(s);
+    function showToast(msg){
+      const t = $('#toast');
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(()=> t.classList.remove('show'), 2400);
+    }
+    function todayISO(){
+      const d = new Date(); d.setHours(0,0,0,0);
+      return d.toISOString().slice(0,10);
+    }
+
+    /* ---------- Renderers ---------- */
+    function renderStats(stats){
+      $('#stats').innerHTML = `
+        <div class="stat"><div>ทั้งหมด</div><strong>${stats.total ?? 0}</strong></div>
+        <div class="stat"><div>พร้อมใช้งาน</div><strong>${stats.available ?? 0}</strong></div>
+        <div class="stat"><div>ถูกยืม</div><strong>${stats.borrowed ?? 0}</strong></div>
+      `;
+    }
+
+    function renderDashboard(){
+      const grid = $('#dashboard');
+      grid.innerHTML = '';
+      BOOKS.forEach(b=>{
+        const isBorrowed = (b.status || '') === 'ถูกยืม';
+        const badge = isBorrowed
+          ? `<span class="badge red">ถูกยืม</span>`
+          : `<span class="badge green">พร้อมใช้งาน</span>`;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<div class="title">${b.title ?? ''}</div>${badge}`;
+        grid.appendChild(card);
+      });
+    }
+
+    function setHistoryFilter(mode){
+      HISTORY_FILTER = mode;
+      $('#tabAll').classList.toggle('active', HISTORY_FILTER==='all');
+      $('#tabActive').classList.toggle('active', HISTORY_FILTER==='active');
+      $('#tabReturned').classList.toggle('active', HISTORY_FILTER==='returned');
+      renderHistory();
+    }
+
+    function renderHistory(){
+      const tbody = document.querySelector('#historyTable tbody');
+      if (!tbody) return;
+      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+
+      const list = (Array.isArray(HISTORY) ? HISTORY : []).filter(h=>{
+        const st = String(h.status || '').trim();
+        if (HISTORY_FILTER === 'active')   return st === 'ยังไม่คืน';
+        if (HISTORY_FILTER === 'returned') return st === 'คืนแล้ว';
+        return true;
+      });
+
+      if (list.length === 0){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 7;
+        td.style.textAlign = 'center';
+        td.style.color = '#6b7280';
+        td.style.padding = '18px';
+        td.textContent = 'ไม่มีข้อมูลประวัติการยืม-คืน';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      for (const h of list){
+        const tr = document.createElement('tr');
+        const cell = (t) => { const td = document.createElement('td'); td.textContent = (t ?? '').toString(); return td; };
+        tr.appendChild(cell(h.id));
+        tr.appendChild(cell(h.bookTitle));
+        tr.appendChild(cell(h.borrower));
+        tr.appendChild(cell(h.borrowDateTxt || '-'));
+        tr.appendChild(cell(h.dueDateTxt || '-'));
+        tr.appendChild(cell(h.returnDateTxt || '-'));
+        tr.appendChild(cell(h.status));
+        tbody.appendChild(tr);
+      }
+    }
+
+    /* ---------- Borrow / Return Modals ---------- */
+    function openBorrow(){
+      google.script.run
+        .withSuccessHandler(list=>{
+          const sel = $('#borrowBookTitle'); sel.innerHTML = '';
+          (list || []).forEach(b=>{
+            const o = document.createElement('option');
+            o.value = b.title; o.textContent = b.title; sel.appendChild(o);
+          });
+          $('#borrowDate').value = todayISO();
+          $('#dueDate').value = '';
+          $('#borrowerName').value = '';
+          $('#borrowModal').style.display = 'flex';
+        })
+        .withFailureHandler(e => { console.error(e); showToast('โหลดรายชื่อหนังสือไม่สำเร็จ'); })
+        .getBorrowableBooks();
+    }
+    function closeBorrow(){ $('#borrowModal').style.display='none'; }
+
+    function openReturn(){
+      google.script.run
+        .withSuccessHandler(list=>{
+          const sel = $('#returnBookTitle'); sel.innerHTML = '';
+          (list || []).forEach(b=>{
+            const o = document.createElement('option');
+            o.value = b.title; o.textContent = b.title; sel.appendChild(o);
+          });
+          $('#returnModal').style.display = 'flex';
+        })
+        .withFailureHandler(e => { console.error(e); showToast('โหลดรายชื่อหนังสือไม่สำเร็จ'); })
+        .getReturnableBooks();
+    }
+    function closeReturn(){ $('#returnModal').style.display='none'; }
+
+    function submitBorrow(){
+      const payload = {
+        bookTitle: $('#borrowBookTitle').value,
+        borrowerName: $('#borrowerName').value.trim(),
+        borrowDateISO: $('#borrowDate').value,
+        dueDateISO: $('#dueDate').value
+      };
+      if (!payload.bookTitle)  return showToast('กรุณาเลือกหนังสือ');
+      if (!payload.borrowerName) return showToast('กรุณากรอกชื่อผู้ยืม');
+
+      google.script.run
+        .withSuccessHandler(res=>{
+          if (res && res.success){
+            closeBorrow(); showToast(res.message || 'ยืมสำเร็จ'); refreshAll();
+          } else { showToast((res && res.message) || 'เกิดข้อผิดพลาด'); }
+        })
+        .withFailureHandler(e => { console.error(e); showToast('เกิดข้อผิดพลาด'); })
+        .borrowBook(payload);
+    }
+
+    function submitReturn(){
+      const payload = { bookTitle: $('#returnBookTitle').value };
+      if (!payload.bookTitle) return showToast('กรุณาเลือกหนังสือ');
+
+      google.script.run
+        .withSuccessHandler(res=>{
+          if (res && res.success){
+            closeReturn(); showToast(res.message || 'คืนสำเร็จ'); refreshAll();
+          } else { showToast((res && res.message) || 'เกิดข้อผิดพลาด'); }
+        })
+        .withFailureHandler(e => { console.error(e); showToast('เกิดข้อผิดพลาด'); })
+        .returnBook(payload);
+    }
+
+    /* ---------- Views ---------- */
+    function toggleHistory(){
+      const wrap = $('#historyWrap');
+      const willShow = wrap.classList.contains('hidden');
+      wrap.classList.toggle('hidden');
+      if (willShow && (!HISTORY || HISTORY.length === 0)) refreshAll();
+      if (!wrap.classList.contains('hidden')){
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }
+    }
+
+    /* ---------- Data Loading ---------- */
+    function refreshAll(){
+      // Books
+      google.script.run
+        .withSuccessHandler(b => { BOOKS = Array.isArray(b) ? b : []; renderDashboard(); })
+        .withFailureHandler(e => { console.error('getBooks failed:', e); })
+        .getBooks();
+
+      // History
+      google.script.run
+        .withSuccessHandler(h => {
+          console.log('Borrow History (stringified):', h);
+          HISTORY = Array.isArray(h) ? h : [];
+          renderHistory();
+        })
+        .withFailureHandler(e => { console.error('getBorrowHistoryForClient failed:', e); })
+        .getBorrowHistoryForClient();
+
+
+      // Stats
+      google.script.run
+        .withSuccessHandler(s => renderStats(s || {total:0,borrowed:0,available:0}))
+        .withFailureHandler(e => { console.error('getDashboardStats failed:', e); })
+        .getDashboardStats();
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', refreshAll);
+  </script>
+</body>
+</html>
